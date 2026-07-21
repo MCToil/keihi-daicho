@@ -458,11 +458,18 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .daterow {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
   @media (max-width: 700px) {
     .addgrid { grid-template-columns: 1fr; }
     .fieldrow { grid-template-columns: repeat(2, 1fr); }
     .fieldtotal { border-left: 0; padding-left: 0; align-items: flex-start; }
     .fieldrow > button { grid-column: 1 / -1; }
+    .daterow { grid-template-columns: repeat(2, 1fr); }
   }
 
   /* ---------- ledger sections ---------- */
@@ -533,6 +540,16 @@
     color: var(--ink-2);
     font-variant-numeric: tabular-nums;
     word-break: break-word;
+  }
+  .row .desc .meta {
+    font-size: 11.5px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+    word-break: break-word;
+  }
+  .row .desc .meta em {
+    font-style: normal;
+    letter-spacing: 0.06em;
   }
   .row .desc .note {
     font-size: 12px;
@@ -723,6 +740,12 @@
       <input type="date" id="fDate" aria-label="利用日">
       <input type="text" id="fName" placeholder="内容（例：〇〇カンファレンス 参加）" aria-label="内容">
     </div>
+    <div class="daterow">
+      <label class="field"><span>期間 開始</span><input type="date" id="fPeriodStart" aria-label="期間の開始日"></label>
+      <label class="field"><span>期間 終了</span><input type="date" id="fPeriodEnd" aria-label="期間の終了日"></label>
+      <label class="field"><span>申請日</span><input type="date" id="fApplied" aria-label="申請日"></label>
+      <label class="field"><span>受取日</span><input type="date" id="fReceived" aria-label="受取日"></label>
+    </div>
     <div class="fieldrow">
       <label class="field"><span>参加費</span><input type="number" id="fFee" min="0" step="1" placeholder="0" aria-label="参加費"></label>
       <label class="field"><span>宿泊費</span><input type="number" id="fLodge" min="0" step="1" placeholder="0" aria-label="宿泊費"></label>
@@ -791,7 +814,16 @@
 
   /* ---------- storage ---------- */
 
-  function blank() { return { version: 2, limit: 300000, items: [] }; }
+  function blank() { return { version: 3, limit: 300000, items: [] }; }
+
+  // ステータスは申請日・受取日から決まる。日付が入った時点でその段階に進む。
+  function deriveStatus(it) {
+    if (it.receivedAt) return "received";
+    if (it.appliedAt) return "applied";
+    return "todo";
+  }
+
+  function str(v) { return typeof v === "string" ? v : ""; }
 
   // 小項目を整え、合計を amount に持たせる。小項目を持たない旧データは「その他」に寄せる。
   function normalize(it) {
@@ -804,6 +836,17 @@
     if (!a) out.other = Math.max(0, Math.round(Number(it.amount) || 0));
     it.amounts = out;
     it.amount = CATS.reduce(function (s, c) { return s + out[c.k]; }, 0);
+
+    it.periodStart = str(it.periodStart);
+    it.periodEnd = str(it.periodEnd);
+    it.appliedAt = str(it.appliedAt);
+    it.receivedAt = str(it.receivedAt);
+
+    // v2以前はステータスだけを持っていた。日付が無いものは利用日で補い、段階を保つ。
+    if (!it.receivedAt && it.status === "received") it.receivedAt = it.appliedAt || it.date;
+    if (!it.appliedAt && (it.status === "applied" || it.status === "received")) it.appliedAt = it.date;
+
+    it.status = deriveStatus(it);
     return it;
   }
 
@@ -814,11 +857,9 @@
       var d = JSON.parse(raw);
       if (!d || !Array.isArray(d.items)) return blank();
       if (typeof d.limit !== "number" || d.limit < 0) d.limit = 300000;
-      d.version = 2;
+      d.version = 3;
       d.items = d.items
-        .filter(function (it) {
-          return it && typeof it.date === "string" && STATUSES.indexOf(it.status) !== -1;
-        })
+        .filter(function (it) { return it && typeof it.date === "string"; })
         .map(normalize);
       return d;
     } catch (e) {
@@ -855,6 +896,19 @@
 
   function fmtDate(iso) {
     return parseInt(iso.slice(5, 7), 10) + "/" + parseInt(iso.slice(8, 10), 10);
+  }
+
+  function fmtDateY(iso) { return iso.slice(0, 4) + "/" + fmtDate(iso); }
+
+  // 年をまたぐ期間だけ年を出す。同じ年なら 5/1 〜 12/20 で足りる。
+  function fmtRange(a, b) {
+    if (a && b) {
+      var sameYear = a.slice(0, 4) === b.slice(0, 4);
+      return sameYear ? fmtDate(a) + " 〜 " + fmtDate(b) : fmtDateY(a) + " 〜 " + fmtDateY(b);
+    }
+    if (a) return fmtDateY(a) + " 〜";
+    if (b) return "〜 " + fmtDateY(b);
+    return "";
   }
 
   function yen(n) { return "¥" + Math.round(n).toLocaleString("ja-JP"); }
@@ -895,6 +949,7 @@
    "bFee","bLodge","bTrans","bOther",
    "overWarn","fDate","fName","fNote","fTotal","addBtn",
    "fFee","fLodge","fTrans","fOther",
+   "fPeriodStart","fPeriodEnd","fApplied","fReceived",
    "cTodo","cApplied","cReceived","tTodo","tApplied","tReceived",
    "rowsTodo","rowsApplied","rowsReceived",
    "exportBtn","importBtn","importFile","toast","themeBtn"]
@@ -1018,6 +1073,16 @@
     return used.map(function (c) { return c.label + " " + yen(it.amounts[c.k]); }).join("・");
   }
 
+  // 期間・申請日・受取日のうち、入っているものだけを [見出し, 値] で返す。
+  function metaParts(it) {
+    var parts = [];
+    var range = fmtRange(it.periodStart, it.periodEnd);
+    if (range) parts.push(["期間", range]);
+    if (it.appliedAt) parts.push(["申請", fmtDate(it.appliedAt)]);
+    if (it.receivedAt) parts.push(["受取", fmtDate(it.receivedAt)]);
+    return parts;
+  }
+
   function viewRow(it) {
     var row = document.createElement("div");
     row.className = "row";
@@ -1040,6 +1105,20 @@
       split.className = "split";
       split.textContent = st;
       desc.appendChild(split);
+    }
+
+    var meta = metaParts(it);
+    if (meta.length) {
+      var m = document.createElement("div");
+      m.className = "meta";
+      meta.forEach(function (part, i) {
+        if (i) m.appendChild(document.createTextNode(" · "));
+        var lab = document.createElement("em");
+        lab.textContent = part[0];
+        m.appendChild(lab);
+        m.appendChild(document.createTextNode(" " + part[1]));
+      });
+      desc.appendChild(m);
     }
 
     if (it.note) {
@@ -1087,6 +1166,23 @@
     top.appendChild(nameI);
     box.appendChild(top);
 
+    var dates = document.createElement("div");
+    dates.className = "daterow";
+    var extraI = {};
+    [["periodStart", "期間 開始"], ["periodEnd", "期間 終了"], ["appliedAt", "申請日"], ["receivedAt", "受取日"]]
+      .forEach(function (d) {
+        var lab = document.createElement("label");
+        lab.className = "field";
+        var cap = document.createElement("span");
+        cap.textContent = d[1];
+        extraI[d[0]] = input("date", it[d[0]] || "");
+        extraI[d[0]].setAttribute("aria-label", d[1]);
+        lab.appendChild(cap);
+        lab.appendChild(extraI[d[0]]);
+        dates.appendChild(lab);
+      });
+    box.appendChild(dates);
+
     var amts = document.createElement("div");
     amts.className = "amts";
     var catI = {};
@@ -1121,10 +1217,20 @@
       });
       if (bad) { toast("金額は0以上の数字で入れてください。"); return; }
       if (total <= 0) { toast("参加費・宿泊費・交通費・その他のどれかに金額を入れてください。"); return; }
+      if (extraI.periodStart.value && extraI.periodEnd.value &&
+          extraI.periodStart.value > extraI.periodEnd.value) {
+        toast("期間の終了日は開始日より後にしてください。");
+        return;
+      }
       it.date = dateI.value;
       it.name = nameI.value.trim();
       it.amounts = next;
       it.amount = total;
+      it.periodStart = extraI.periodStart.value;
+      it.periodEnd = extraI.periodEnd.value;
+      it.appliedAt = extraI.appliedAt.value;
+      it.receivedAt = extraI.receivedAt.value;
+      it.status = deriveStatus(it);
       it.note = noteI.value.trim();
       editingId = null;
       save();
@@ -1163,15 +1269,24 @@
     return null;
   }
 
+  // 進めるときは日付が空なら今日を入れ、戻すときはその段階の日付を消す。
   function setStatus(id, status) {
     var it = find(id);
     if (!it) return;
-    it.status = status;
-    if (status === "applied") it.appliedAt = todayISO();
-    if (status === "received") it.receivedAt = todayISO();
+    if (status === "todo") {
+      it.appliedAt = "";
+      it.receivedAt = "";
+    } else if (status === "applied") {
+      if (!it.appliedAt) it.appliedAt = todayISO();
+      it.receivedAt = "";
+    } else {
+      if (!it.appliedAt) it.appliedAt = todayISO();
+      if (!it.receivedAt) it.receivedAt = todayISO();
+    }
+    it.status = deriveStatus(it);
     save();
     render();
-    toast(LABEL[status] + "に移しました");
+    toast(LABEL[it.status] + "に移しました");
   }
 
   function remove(it) {
@@ -1207,28 +1322,40 @@
       el.fFee.focus();
       return;
     }
+    if (el.fPeriodStart.value && el.fPeriodEnd.value && el.fPeriodStart.value > el.fPeriodEnd.value) {
+      toast("期間の終了日は開始日より後にしてください。");
+      el.fPeriodEnd.focus();
+      return;
+    }
 
-    state.items.push({
+    var item = {
       id: "k" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       date: date,
       name: name,
       amounts: f.amounts,
       amount: f.total,
+      periodStart: el.fPeriodStart.value,
+      periodEnd: el.fPeriodEnd.value,
+      appliedAt: el.fApplied.value,
+      receivedAt: el.fReceived.value,
       note: el.fNote.value.trim(),
       status: "todo"
-    });
+    };
+    item.status = deriveStatus(item);
+    state.items.push(item);
     save();
 
     el.fName.value = "";
     el.fNote.value = "";
     CATS.forEach(function (c) { el["f" + c.id].value = ""; });
+    [el.fPeriodStart, el.fPeriodEnd, el.fApplied, el.fReceived].forEach(function (i) { i.value = ""; });
     refreshFormTotal();
 
     var t = termOf(date);
     if (t !== currentTerm) currentTerm = t;
     render();
     el.fName.focus();
-    toast("申請未に追加しました");
+    toast(LABEL[item.status] + "に追加しました");
   }
 
   /* ---------- backup ---------- */
@@ -1272,13 +1399,11 @@
         var d = JSON.parse(String(r.result));
         if (!d || !Array.isArray(d.items)) throw new Error("bad");
         var items = d.items
-          .filter(function (it) {
-            return it && typeof it.date === "string" && STATUSES.indexOf(it.status) !== -1;
-          })
+          .filter(function (it) { return it && typeof it.date === "string"; })
           .map(normalize);
         if (!confirm("いまのデータを、読み込んだ " + items.length + "件で置き換えます。よろしいですか？")) return;
         state = {
-          version: 2,
+          version: 3,
           limit: typeof d.limit === "number" && d.limit >= 0 ? d.limit : 300000,
           items: items
         };
