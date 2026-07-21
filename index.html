@@ -410,7 +410,7 @@
 
   .addgrid {
     display: grid;
-    grid-template-columns: 160px 1fr;
+    grid-template-columns: 160px 1fr auto;
     gap: 10px;
     align-items: center;
   }
@@ -460,8 +460,48 @@
 
   .daterow {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 10px;
+  }
+
+  /* WEB チェック */
+
+  .checkfield {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    background: var(--card);
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+    transition: background .13s, border-color .13s, color .13s;
+  }
+
+  .checkfield input {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .checkfield span { font-size: 13px; letter-spacing: 0.12em; }
+
+  .checkfield.on {
+    border-color: var(--accent-mid);
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .field input:disabled { opacity: .35; cursor: not-allowed; }
+  .field.off > span { opacity: .35; }
+
+  @media (max-width: 940px) {
+    .daterow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
 
   @media (max-width: 700px) {
@@ -469,7 +509,8 @@
     .fieldrow { grid-template-columns: repeat(2, 1fr); }
     .fieldtotal { border-left: 0; padding-left: 0; align-items: flex-start; }
     .fieldrow > button { grid-column: 1 / -1; }
-    .daterow { grid-template-columns: repeat(2, 1fr); }
+    .daterow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .checkfield { justify-content: center; }
   }
 
   /* ---------- ledger sections ---------- */
@@ -535,6 +576,20 @@
 
   .row .desc { min-width: 0; }
   .row .desc .name { word-break: break-word; }
+
+  .pill-web {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 0 5px;
+    font-size: 10px;
+    line-height: 1.6;
+    letter-spacing: 0.12em;
+    vertical-align: 1px;
+    border-radius: 2px;
+    border: 1px solid var(--accent-mid);
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
   .row .desc .split {
     font-size: 11.5px;
     color: var(--ink-2);
@@ -600,13 +655,14 @@
     border-bottom: 1px solid var(--rule-soft);
     background: var(--rule-soft);
   }
-  .editrow .top { display: grid; grid-template-columns: 160px 1fr; gap: 9px; }
+  .editrow .top { display: grid; grid-template-columns: 160px 1fr auto; gap: 9px; }
   .editrow .amts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
   .editrow .btns { display: flex; gap: 6px; }
 
   @media (max-width: 700px) {
     .editrow .top { grid-template-columns: 1fr; }
     .editrow .amts { grid-template-columns: repeat(2, 1fr); }
+    .editrow .top .checkfield { grid-column: 1 / -1; }
   }
 
   /* ---------- footer ---------- */
@@ -739,10 +795,15 @@
     <div class="addgrid">
       <input type="date" id="fDate" aria-label="利用日">
       <input type="text" id="fName" placeholder="内容（例：〇〇カンファレンス 参加）" aria-label="内容">
+      <label class="checkfield" id="fWebBox">
+        <input type="checkbox" id="fWeb" aria-label="WEB（宿泊費・交通費なし）">
+        <span>WEB</span>
+      </label>
     </div>
     <div class="daterow">
       <label class="field"><span>期間 開始</span><input type="date" id="fPeriodStart" aria-label="期間の開始日"></label>
       <label class="field"><span>期間 終了</span><input type="date" id="fPeriodEnd" aria-label="期間の終了日"></label>
+      <label class="field"><span>支払日</span><input type="date" id="fPaid" aria-label="支払日"></label>
       <label class="field"><span>申請日</span><input type="date" id="fApplied" aria-label="申請日"></label>
       <label class="field"><span>受取日</span><input type="date" id="fReceived" aria-label="受取日"></label>
     </div>
@@ -814,7 +875,10 @@
 
   /* ---------- storage ---------- */
 
-  function blank() { return { version: 3, limit: 300000, items: [] }; }
+  function blank() { return { version: 4, limit: 300000, items: [] }; }
+
+  // WEB受講なら現地に行かないので、宿泊費と交通費は持たない。
+  var WEB_EXCLUDED = ["lodge", "trans"];
 
   // ステータスは申請日・受取日から決まる。日付が入った時点でその段階に進む。
   function deriveStatus(it) {
@@ -834,11 +898,16 @@
       out[c.k] = isFinite(v) && v > 0 ? Math.round(v) : 0;
     });
     if (!a) out.other = Math.max(0, Math.round(Number(it.amount) || 0));
+
+    it.web = it.web === true;
+    if (it.web) WEB_EXCLUDED.forEach(function (k) { out[k] = 0; });
+
     it.amounts = out;
     it.amount = CATS.reduce(function (s, c) { return s + out[c.k]; }, 0);
 
     it.periodStart = str(it.periodStart);
     it.periodEnd = str(it.periodEnd);
+    it.paidAt = str(it.paidAt);
     it.appliedAt = str(it.appliedAt);
     it.receivedAt = str(it.receivedAt);
 
@@ -857,7 +926,7 @@
       var d = JSON.parse(raw);
       if (!d || !Array.isArray(d.items)) return blank();
       if (typeof d.limit !== "number" || d.limit < 0) d.limit = 300000;
-      d.version = 3;
+      d.version = 4;
       d.items = d.items
         .filter(function (it) { return it && typeof it.date === "string"; })
         .map(normalize);
@@ -949,7 +1018,7 @@
    "bFee","bLodge","bTrans","bOther",
    "overWarn","fDate","fName","fNote","fTotal","addBtn",
    "fFee","fLodge","fTrans","fOther",
-   "fPeriodStart","fPeriodEnd","fApplied","fReceived",
+   "fPeriodStart","fPeriodEnd","fPaid","fApplied","fReceived","fWeb","fWebBox",
    "cTodo","cApplied","cReceived","tTodo","tApplied","tReceived",
    "rowsTodo","rowsApplied","rowsReceived",
    "exportBtn","importBtn","importFile","toast","themeBtn"]
@@ -1078,6 +1147,7 @@
     var parts = [];
     var range = fmtRange(it.periodStart, it.periodEnd);
     if (range) parts.push(["期間", range]);
+    if (it.paidAt) parts.push(["支払", fmtDate(it.paidAt)]);
     if (it.appliedAt) parts.push(["申請", fmtDate(it.appliedAt)]);
     if (it.receivedAt) parts.push(["受取", fmtDate(it.receivedAt)]);
     return parts;
@@ -1097,6 +1167,12 @@
     var name = document.createElement("div");
     name.className = "name";
     name.textContent = it.name || "（無題）";
+    if (it.web) {
+      var pill = document.createElement("span");
+      pill.className = "pill-web";
+      pill.textContent = "WEB";
+      name.appendChild(pill);
+    }
     desc.appendChild(name);
 
     var st = splitText(it);
@@ -1160,16 +1236,19 @@
     var nameI = input("text", it.name || "");
     nameI.placeholder = "内容";
 
+    var web = checkBox("WEB", it.web);
+
     var top = document.createElement("div");
     top.className = "top";
     top.appendChild(dateI);
     top.appendChild(nameI);
+    top.appendChild(web.label);
     box.appendChild(top);
 
     var dates = document.createElement("div");
     dates.className = "daterow";
     var extraI = {};
-    [["periodStart", "期間 開始"], ["periodEnd", "期間 終了"], ["appliedAt", "申請日"], ["receivedAt", "受取日"]]
+    [["periodStart", "期間 開始"], ["periodEnd", "期間 終了"], ["paidAt", "支払日"], ["appliedAt", "申請日"], ["receivedAt", "受取日"]]
       .forEach(function (d) {
         var lab = document.createElement("label");
         lab.className = "field";
@@ -1200,6 +1279,11 @@
     });
     box.appendChild(amts);
 
+    syncWeb(web.input.checked, catI, web.label);
+    web.input.addEventListener("change", function () {
+      syncWeb(web.input.checked, catI, web.label);
+    });
+
     var noteI = input("text", it.note || "");
     noteI.placeholder = "メモ";
     box.appendChild(noteI);
@@ -1224,10 +1308,12 @@
       }
       it.date = dateI.value;
       it.name = nameI.value.trim();
+      it.web = web.input.checked;
       it.amounts = next;
       it.amount = total;
       it.periodStart = extraI.periodStart.value;
       it.periodEnd = extraI.periodEnd.value;
+      it.paidAt = extraI.paidAt.value;
       it.appliedAt = extraI.appliedAt.value;
       it.receivedAt = extraI.receivedAt.value;
       it.status = deriveStatus(it);
@@ -1243,6 +1329,34 @@
 
     setTimeout(function () { nameI.focus(); }, 0);
     return box;
+  }
+
+  // WEBのときは宿泊費・交通費を0にして触れないようにする。合計に即反映されるので
+  // 何が消えたかはその場で分かる。
+  function syncWeb(checked, inputs, boxEl) {
+    WEB_EXCLUDED.forEach(function (k) {
+      var i = inputs[k];
+      if (!i) return;
+      i.disabled = checked;
+      if (checked) i.value = "";
+      var field = i.parentNode;
+      if (field && field.classList) field.classList.toggle("off", checked);
+    });
+    if (boxEl) boxEl.classList.toggle("on", checked);
+  }
+
+  function checkBox(labelText, checked) {
+    var lab = document.createElement("label");
+    lab.className = "checkfield";
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = checked;
+    cb.setAttribute("aria-label", "WEB（宿泊費・交通費なし）");
+    var sp = document.createElement("span");
+    sp.textContent = labelText;
+    lab.appendChild(cb);
+    lab.appendChild(sp);
+    return { label: lab, input: cb };
   }
 
   function input(type, value) {
@@ -1312,6 +1426,12 @@
     el.fTotal.textContent = yen(readForm().total);
   }
 
+  function syncAddWeb() {
+    var inputs = {};
+    CATS.forEach(function (c) { inputs[c.k] = el["f" + c.id]; });
+    syncWeb(el.fWeb.checked, inputs, el.fWebBox);
+  }
+
   function add() {
     var date = el.fDate.value || todayISO();
     var name = el.fName.value.trim();
@@ -1332,23 +1452,28 @@
       id: "k" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       date: date,
       name: name,
+      web: el.fWeb.checked,
       amounts: f.amounts,
       amount: f.total,
       periodStart: el.fPeriodStart.value,
       periodEnd: el.fPeriodEnd.value,
+      paidAt: el.fPaid.value,
       appliedAt: el.fApplied.value,
       receivedAt: el.fReceived.value,
       note: el.fNote.value.trim(),
       status: "todo"
     };
     item.status = deriveStatus(item);
-    state.items.push(item);
+    state.items.push(normalize(item));
     save();
 
     el.fName.value = "";
     el.fNote.value = "";
     CATS.forEach(function (c) { el["f" + c.id].value = ""; });
-    [el.fPeriodStart, el.fPeriodEnd, el.fApplied, el.fReceived].forEach(function (i) { i.value = ""; });
+    [el.fPeriodStart, el.fPeriodEnd, el.fPaid, el.fApplied, el.fReceived]
+      .forEach(function (i) { i.value = ""; });
+    el.fWeb.checked = false;
+    syncAddWeb();
     refreshFormTotal();
 
     var t = termOf(date);
@@ -1403,7 +1528,7 @@
           .map(normalize);
         if (!confirm("いまのデータを、読み込んだ " + items.length + "件で置き換えます。よろしいですか？")) return;
         state = {
-          version: 3,
+          version: 4,
           limit: typeof d.limit === "number" && d.limit >= 0 ? d.limit : 300000,
           items: items
         };
@@ -1477,6 +1602,11 @@
     el["f" + c.id].addEventListener("input", refreshFormTotal);
   });
 
+  el.fWeb.addEventListener("change", function () {
+    syncAddWeb();
+    refreshFormTotal();
+  });
+
   el.termSelect.addEventListener("change", function () {
     currentTerm = Number(el.termSelect.value);
     editingId = null;
@@ -1501,6 +1631,7 @@
 
   applyTheme(storedTheme() || osTheme());
   el.fDate.value = todayISO();
+  syncAddWeb();
   refreshFormTotal();
   render();
 })();
