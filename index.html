@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>費用申請台帳</title>
+<meta name="description" content="期ごとの費用申請を、申請未・申請済み・受取済みの3段階で管理する台帳。">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#eceee9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111513" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="費用申請台帳">
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="%231e544b"/><g stroke="%23eceee9" stroke-width="2.6" stroke-linecap="round"><path d="M9 11h14M9 16h14M9 21h8"/></g></svg>'>
+
+<style>
+  :root {
+    --paper:      #eceee9;
+    --card:       #fafbf8;
+    --rule:       #d5dad2;
+    --rule-soft:  #e4e8e1;
+    --ink:        #1a211d;
+    --ink-2:      #5c675f;
+    --ink-3:      #8a948c;
+    --accent:     #1e544b;
+    --accent-mid: #6e9c92;
+    --accent-soft:#d6e4df;
+    --on-accent:  #f4f7f4;
+    --alert:      #9d3d2c;
+    --alert-soft: #f0dcd7;
+
+    --font-display: "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "Noto Serif JP", serif;
+    --font-ui: "Hiragino Sans", "Yu Gothic", YuGothic, "Noto Sans JP", system-ui, sans-serif;
+    --font-num: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+
+    --r: 3px;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:      #111513;
+      --card:       #1a201d;
+      --rule:       #2e3733;
+      --rule-soft:  #242b28;
+      --ink:        #e7ece8;
+      --ink-2:      #98a49d;
+      --ink-3:      #6d7873;
+      --accent:     #74c3b1;
+      --accent-mid: #43806f;
+      --accent-soft:#22352f;
+      --on-accent:  #0e1614;
+      --alert:      #e0907c;
+      --alert-soft: #3a221c;
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #111513;
+    --card:       #1a201d;
+    --rule:       #2e3733;
+    --rule-soft:  #242b28;
+    --ink:        #e7ece8;
+    --ink-2:      #98a49d;
+    --ink-3:      #6d7873;
+    --accent:     #74c3b1;
+    --accent-mid: #43806f;
+    --accent-soft:#22352f;
+    --on-accent:  #0e1614;
+    --alert:      #e0907c;
+    --alert-soft: #3a221c;
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] {
+    --paper:      #eceee9;
+    --card:       #fafbf8;
+    --rule:       #d5dad2;
+    --rule-soft:  #e4e8e1;
+    --ink:        #1a211d;
+    --ink-2:      #5c675f;
+    --ink-3:      #8a948c;
+    --accent:     #1e544b;
+    --accent-mid: #6e9c92;
+    --accent-soft:#d6e4df;
+    --on-accent:  #f4f7f4;
+    --alert:      #9d3d2c;
+    --alert-soft: #f0dcd7;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 15px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 40px 20px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+  }
+
+  /* ---------- header ---------- */
+
+  .masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px 20px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .masthead h1 {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .masthead .sub {
+    font-size: 12px;
+    color: var(--ink-2);
+    letter-spacing: 0.09em;
+  }
+
+  /* ---------- term selector ---------- */
+
+  .term {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .term select {
+    font-family: var(--font-ui);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+
+  .term button {
+    width: 30px;
+    height: 30px;
+    flex: none;
+  }
+
+  /* ---------- buttons ---------- */
+
+  button {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    padding: 5px 11px;
+    cursor: pointer;
+    transition: background .13s, border-color .13s, color .13s;
+  }
+
+  button:hover { border-color: var(--accent-mid); background: var(--rule-soft); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
+  }
+  button.primary:hover { background: var(--accent-mid); border-color: var(--accent-mid); color: var(--on-accent); }
+
+  button.advance {
+    border-color: var(--accent-mid);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  button.advance:hover { background: var(--accent-soft); }
+
+  button.quiet { color: var(--ink-3); border-color: transparent; padding: 5px 7px; }
+  button.quiet:hover { color: var(--ink); background: var(--rule-soft); border-color: transparent; }
+
+  button.danger:hover { color: var(--alert); background: var(--alert-soft); border-color: var(--alert); }
+
+  /* ---------- inputs ---------- */
+
+  input[type="text"], input[type="date"], input[type="number"] {
+    font-family: var(--font-ui);
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    padding: 7px 9px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  input[type="number"] { font-family: var(--font-num); text-align: right; }
+  input:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+
+  /* ---------- summary ---------- */
+
+  .summary {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    padding: 24px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px 24px;
+  }
+
+  .hero .label {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--ink-2);
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .hero .big {
+    font-family: var(--font-num);
+    font-size: clamp(34px, 8vw, 46px);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+  }
+
+  .hero .big.over { color: var(--alert); }
+
+  .hero .cap {
+    font-family: var(--font-num);
+    font-size: 13px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .hero .cap input {
+    width: 96px;
+    display: inline-block;
+    padding: 3px 6px;
+    font-size: 13px;
+  }
+
+  /* gauge */
+
+  .gauge {
+    height: 15px;
+    background: var(--rule-soft);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .gauge span { display: block; height: 100%; transition: width .3s ease; }
+  .seg-received { background: var(--accent); }
+  .seg-applied  { background: var(--accent-mid); }
+  .seg-todo     {
+    background:
+      repeating-linear-gradient(45deg, var(--accent-mid) 0 2px, transparent 2px 6px),
+      var(--accent-soft);
+  }
+  .seg-over { background: var(--alert); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+
+  .stat {
+    background: var(--card);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stat .k {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--ink-2);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .stat .swatch {
+    width: 9px; height: 9px; flex: none;
+    border-radius: 1px;
+    border: 1px solid var(--rule);
+  }
+  .swatch.received { background: var(--accent); border-color: var(--accent); }
+  .swatch.applied  { background: var(--accent-mid); border-color: var(--accent-mid); }
+  .swatch.todo     { background: repeating-linear-gradient(45deg, var(--accent-mid) 0 2px, transparent 2px 5px), var(--accent-soft); border-color: var(--accent-mid); }
+  .swatch.rest     { background: var(--rule-soft); }
+
+  .stat .v {
+    font-family: var(--font-num);
+    font-size: 18px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat .n { font-size: 11px; color: var(--ink-3); }
+
+  @media (max-width: 760px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* 期の内訳 */
+
+  .breakdown { display: flex; flex-direction: column; gap: 8px; }
+
+  .breakdown > .bl {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--ink-2);
+  }
+
+  .bgrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px 14px;
+  }
+
+  .bgrid > div {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding-left: 11px;
+    border-left: 2px solid var(--accent-soft);
+    min-width: 0;
+  }
+
+  .bgrid span { font-size: 11px; color: var(--ink-2); letter-spacing: 0.08em; }
+
+  .bgrid b {
+    font-family: var(--font-num);
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 700px) {
+    .bgrid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .warn {
+    background: var(--alert-soft);
+    color: var(--alert);
+    border-radius: var(--r);
+    padding: 9px 13px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  /* ---------- add form ---------- */
+
+  .addbar {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .addbar .title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    letter-spacing: 0.1em;
+  }
+
+  .addgrid {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .fieldrow {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr) 128px auto;
+    gap: 10px;
+    align-items: end;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .field > span {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--ink-2);
+  }
+
+  .fieldtotal {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    align-items: flex-end;
+    border-left: 1px solid var(--rule);
+    padding-left: 14px;
+  }
+
+  .fieldtotal > span:first-child {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--ink-2);
+  }
+
+  .fieldtotal .v {
+    font-family: var(--font-num);
+    font-size: 19px;
+    font-weight: 600;
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 700px) {
+    .addgrid { grid-template-columns: 1fr; }
+    .fieldrow { grid-template-columns: repeat(2, 1fr); }
+    .fieldtotal { border-left: 0; padding-left: 0; align-items: flex-start; }
+    .fieldrow > button { grid-column: 1 / -1; }
+  }
+
+  /* ---------- ledger sections ---------- */
+
+  .ledger { display: flex; flex-direction: column; gap: 0; }
+
+  .ledger > h2 {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .lhead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--ink-2);
+  }
+
+  .lhead .count {
+    font-family: var(--font-num);
+    font-size: 12px;
+    color: var(--ink-3);
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .lhead .subtotal {
+    font-family: var(--font-num);
+    font-size: 16px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .rows { display: flex; flex-direction: column; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 96px 1fr 118px auto;
+    gap: 4px 14px;
+    align-items: center;
+    padding: 11px 2px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .row:hover { background: var(--rule-soft); }
+
+  .row .date {
+    font-family: var(--font-num);
+    font-size: 12.5px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .row .desc { min-width: 0; }
+  .row .desc .name { word-break: break-word; }
+  .row .desc .split {
+    font-size: 11.5px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+    word-break: break-word;
+  }
+  .row .desc .note {
+    font-size: 12px;
+    color: var(--ink-3);
+    word-break: break-word;
+  }
+
+  .row .amt {
+    font-family: var(--font-num);
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .row .acts {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 640px) {
+    .row {
+      grid-template-columns: 1fr auto;
+      row-gap: 6px;
+    }
+    .row .date  { grid-column: 1; }
+    .row .amt   { grid-column: 2; }
+    .row .desc  { grid-column: 1 / -1; }
+    .row .acts  { grid-column: 1 / -1; justify-content: flex-start; }
+  }
+
+  .empty {
+    padding: 18px 2px;
+    color: var(--ink-3);
+    font-size: 13px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  /* inline edit */
+
+  .editrow {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 14px 10px;
+    border-bottom: 1px solid var(--rule-soft);
+    background: var(--rule-soft);
+  }
+  .editrow .top { display: grid; grid-template-columns: 160px 1fr; gap: 9px; }
+  .editrow .amts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+  .editrow .btns { display: flex; gap: 6px; }
+
+  @media (max-width: 700px) {
+    .editrow .top { grid-template-columns: 1fr; }
+    .editrow .amts { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ---------- footer ---------- */
+
+  .tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+  }
+
+  .tools .note {
+    font-size: 12px;
+    color: var(--ink-3);
+    margin-left: auto;
+  }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 26px;
+    transform: translateX(-50%) translateY(14px);
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 13px;
+    padding: 9px 18px;
+    border-radius: 100px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    z-index: 20;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* masthead 右側 */
+
+  .mhright { display: flex; align-items: center; gap: 12px; }
+
+  #themeBtn {
+    width: 32px;
+    height: 30px;
+    flex: none;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--ink-2);
+  }
+  #themeBtn:hover { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div>
+      <h1>費用申請台帳</h1>
+      <span class="sub" id="termRange">—</span>
+    </div>
+    <div class="mhright">
+      <button type="button" id="themeBtn" class="quiet" aria-label="表示テーマを切り替え">☾</button>
+      <div class="term">
+        <button type="button" id="prevTerm" aria-label="前の期">◀</button>
+        <select id="termSelect" aria-label="期を選択"></select>
+        <button type="button" id="nextTerm" aria-label="次の期">▶</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="summary" aria-label="期の集計">
+    <div class="hero">
+      <div>
+        <span class="label">残 枠</span>
+        <div class="big" id="remainVal">¥0</div>
+      </div>
+      <div class="cap">
+        上限
+        <input type="number" id="limitInput" step="10000" min="0" aria-label="期の上限額">
+        円 / 期
+      </div>
+    </div>
+
+    <div class="gauge" id="gauge" role="img" aria-label="枠の消化状況"></div>
+
+    <div class="stats">
+      <div class="stat">
+        <span class="k"><i class="swatch received"></i>受取済み</span>
+        <span class="v" id="sReceived">¥0</span>
+        <span class="n" id="nReceived">0件</span>
+      </div>
+      <div class="stat">
+        <span class="k"><i class="swatch applied"></i>申請済み</span>
+        <span class="v" id="sApplied">¥0</span>
+        <span class="n" id="nApplied">0件</span>
+      </div>
+      <div class="stat">
+        <span class="k"><i class="swatch todo"></i>申請未</span>
+        <span class="v" id="sTodo">¥0</span>
+        <span class="n" id="nTodo">0件</span>
+      </div>
+      <div class="stat">
+        <span class="k"><i class="swatch rest"></i>残枠</span>
+        <span class="v" id="sRest">¥0</span>
+        <span class="n" id="nRest">上限まで</span>
+      </div>
+    </div>
+
+    <div class="breakdown">
+      <span class="bl">こ の 期 の 内 訳</span>
+      <div class="bgrid">
+        <div><span>参加費</span><b id="bFee">¥0</b></div>
+        <div><span>宿泊費</span><b id="bLodge">¥0</b></div>
+        <div><span>交通費</span><b id="bTrans">¥0</b></div>
+        <div><span>その他</span><b id="bOther">¥0</b></div>
+      </div>
+    </div>
+
+    <div class="warn" id="overWarn" hidden></div>
+  </section>
+
+  <section class="addbar">
+    <div class="title">新しい費用を記録</div>
+    <div class="addgrid">
+      <input type="date" id="fDate" aria-label="利用日">
+      <input type="text" id="fName" placeholder="内容（例：〇〇カンファレンス 参加）" aria-label="内容">
+    </div>
+    <div class="fieldrow">
+      <label class="field"><span>参加費</span><input type="number" id="fFee" min="0" step="1" placeholder="0" aria-label="参加費"></label>
+      <label class="field"><span>宿泊費</span><input type="number" id="fLodge" min="0" step="1" placeholder="0" aria-label="宿泊費"></label>
+      <label class="field"><span>交通費</span><input type="number" id="fTrans" min="0" step="1" placeholder="0" aria-label="交通費"></label>
+      <label class="field"><span>その他</span><input type="number" id="fOther" min="0" step="1" placeholder="0" aria-label="その他"></label>
+      <div class="fieldtotal"><span>合計</span><span class="v" id="fTotal">¥0</span></div>
+      <button type="button" class="primary" id="addBtn">追加</button>
+    </div>
+    <input type="text" id="fNote" placeholder="メモ（任意：領収書の所在、申請番号など）" aria-label="メモ">
+  </section>
+
+  <section class="ledger" data-status="todo">
+    <div class="lhead">
+      <h2>申請未 <span class="count" id="cTodo">0件</span></h2>
+      <span class="subtotal" id="tTodo">¥0</span>
+    </div>
+    <div class="rows" id="rowsTodo"></div>
+  </section>
+
+  <section class="ledger" data-status="applied">
+    <div class="lhead">
+      <h2>申請済み <span class="count" id="cApplied">0件</span></h2>
+      <span class="subtotal" id="tApplied">¥0</span>
+    </div>
+    <div class="rows" id="rowsApplied"></div>
+  </section>
+
+  <section class="ledger" data-status="received">
+    <div class="lhead">
+      <h2>受取済み <span class="count" id="cReceived">0件</span></h2>
+      <span class="subtotal" id="tReceived">¥0</span>
+    </div>
+    <div class="rows" id="rowsReceived"></div>
+  </section>
+
+  <footer class="tools">
+    <button type="button" id="exportBtn">バックアップを保存</button>
+    <button type="button" id="importBtn">バックアップから復元</button>
+    <input type="file" id="importFile" accept="application/json,.json" class="sr">
+    <span class="note">期は4月1日〜翌3月31日。データはこのブラウザ内に保存されます。</span>
+  </footer>
+
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var KEY = "keihi-daicho-v1";
+  var STATUSES = ["todo", "applied", "received"];
+  var LABEL = { todo: "申請未", applied: "申請済み", received: "受取済み" };
+
+  // 小項目。1件の費用をこの4つに分けて記録する。
+  var CATS = [
+    { k: "fee",   label: "参加費", id: "Fee" },
+    { k: "lodge", label: "宿泊費", id: "Lodge" },
+    { k: "trans", label: "交通費", id: "Trans" },
+    { k: "other", label: "その他", id: "Other" }
+  ];
+
+  var state = load();
+  var currentTerm = termOf(todayISO());
+  var editingId = null;
+
+  /* ---------- storage ---------- */
+
+  function blank() { return { version: 2, limit: 300000, items: [] }; }
+
+  // 小項目を整え、合計を amount に持たせる。小項目を持たない旧データは「その他」に寄せる。
+  function normalize(it) {
+    var a = it.amounts && typeof it.amounts === "object" ? it.amounts : null;
+    var out = {};
+    CATS.forEach(function (c) {
+      var v = a ? Number(a[c.k]) : 0;
+      out[c.k] = isFinite(v) && v > 0 ? Math.round(v) : 0;
+    });
+    if (!a) out.other = Math.max(0, Math.round(Number(it.amount) || 0));
+    it.amounts = out;
+    it.amount = CATS.reduce(function (s, c) { return s + out[c.k]; }, 0);
+    return it;
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return blank();
+      var d = JSON.parse(raw);
+      if (!d || !Array.isArray(d.items)) return blank();
+      if (typeof d.limit !== "number" || d.limit < 0) d.limit = 300000;
+      d.version = 2;
+      d.items = d.items
+        .filter(function (it) {
+          return it && typeof it.date === "string" && STATUSES.indexOf(it.status) !== -1;
+        })
+        .map(normalize);
+      return d;
+    } catch (e) {
+      return blank();
+    }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(state));
+    } catch (e) {
+      toast("保存できませんでした。ブラウザの保存容量またはプライベートモードを確認してください。");
+    }
+  }
+
+  /* ---------- dates & terms ---------- */
+
+  function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+  // 期 = 会計年度。4月始まりなので 1〜3月は前年の期に属する。
+  function termOf(iso) {
+    var y = parseInt(iso.slice(0, 4), 10);
+    var m = parseInt(iso.slice(5, 7), 10);
+    return m >= 4 ? y : y - 1;
+  }
+
+  function termLabel(t) { return t + "年度"; }
+  function termRange(t) { return t + "年4月1日 〜 " + (t + 1) + "年3月31日"; }
+
+  function fmtDate(iso) {
+    return parseInt(iso.slice(5, 7), 10) + "/" + parseInt(iso.slice(8, 10), 10);
+  }
+
+  function yen(n) { return "¥" + Math.round(n).toLocaleString("ja-JP"); }
+
+  /* ---------- derived ---------- */
+
+  function itemsOf(term) {
+    return state.items.filter(function (it) { return termOf(it.date) === term; })
+      .sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  }
+
+  function sum(list) {
+    return list.reduce(function (a, it) { return a + (Number(it.amount) || 0); }, 0);
+  }
+
+  function catTotals(list) {
+    var t = {};
+    CATS.forEach(function (c) { t[c.k] = 0; });
+    list.forEach(function (it) {
+      CATS.forEach(function (c) { t[c.k] += Number(it.amounts[c.k]) || 0; });
+    });
+    return t;
+  }
+
+  function knownTerms() {
+    var set = {};
+    set[currentTerm] = true;
+    set[termOf(todayISO())] = true;
+    state.items.forEach(function (it) { set[termOf(it.date)] = true; });
+    return Object.keys(set).map(Number).sort(function (a, b) { return b - a; });
+  }
+
+  /* ---------- render ---------- */
+
+  var el = {};
+  ["termRange","termSelect","prevTerm","nextTerm","remainVal","limitInput","gauge",
+   "sReceived","sApplied","sTodo","sRest","nReceived","nApplied","nTodo","nRest",
+   "bFee","bLodge","bTrans","bOther",
+   "overWarn","fDate","fName","fNote","fTotal","addBtn",
+   "fFee","fLodge","fTrans","fOther",
+   "cTodo","cApplied","cReceived","tTodo","tApplied","tReceived",
+   "rowsTodo","rowsApplied","rowsReceived",
+   "exportBtn","importBtn","importFile","toast","themeBtn"]
+    .forEach(function (id) { el[id] = document.getElementById(id); });
+
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function render() {
+    // 期セレクタ
+    var terms = knownTerms();
+    el.termSelect.innerHTML = "";
+    terms.forEach(function (t) {
+      var o = document.createElement("option");
+      o.value = String(t);
+      o.textContent = termLabel(t);
+      if (t === currentTerm) o.selected = true;
+      el.termSelect.appendChild(o);
+    });
+    el.termRange.textContent = termRange(currentTerm);
+
+    var all = itemsOf(currentTerm);
+    var by = {};
+    STATUSES.forEach(function (s) {
+      by[s] = all.filter(function (it) { return it.status === s; });
+    });
+
+    var totals = {
+      todo: sum(by.todo),
+      applied: sum(by.applied),
+      received: sum(by.received)
+    };
+    var used = totals.todo + totals.applied + totals.received;
+    var limit = state.limit;
+    var remain = limit - used;
+
+    el.limitInput.value = limit;
+
+    el.remainVal.textContent = yen(remain);
+    el.remainVal.classList.toggle("over", remain < 0);
+
+    el.sReceived.textContent = yen(totals.received);
+    el.sApplied.textContent  = yen(totals.applied);
+    el.sTodo.textContent     = yen(totals.todo);
+    el.sRest.textContent     = yen(remain);
+    el.nReceived.textContent = by.received.length + "件";
+    el.nApplied.textContent  = by.applied.length + "件 · 入金待ち";
+    el.nTodo.textContent     = by.todo.length + "件 · 要対応";
+    el.nRest.textContent     = limit > 0 ? Math.max(0, Math.round(remain / limit * 100)) + "% 残り" : "—";
+
+    // 小項目の内訳（この期の全件）
+    var cats = catTotals(all);
+    CATS.forEach(function (c) { el["b" + c.id].textContent = yen(cats[c.k]); });
+
+    // ゲージ
+    el.gauge.innerHTML = "";
+    var base = Math.max(limit, used) || 1;
+    function seg(cls, val) {
+      if (val <= 0) return;
+      var s = document.createElement("span");
+      s.className = cls;
+      s.style.width = (val / base * 100) + "%";
+      el.gauge.appendChild(s);
+    }
+    if (remain >= 0) {
+      seg("seg-received", totals.received);
+      seg("seg-applied", totals.applied);
+      seg("seg-todo", totals.todo);
+    } else {
+      // 超過分だけ赤で示す
+      var over = -remain;
+      var withinRatio = limit / used;
+      seg("seg-received", totals.received * withinRatio);
+      seg("seg-applied", totals.applied * withinRatio);
+      seg("seg-todo", totals.todo * withinRatio);
+      seg("seg-over", over);
+    }
+
+    if (remain < 0) {
+      el.overWarn.hidden = false;
+      el.overWarn.textContent = "上限を " + yen(-remain) + " 超えています。申請未の分を次の期に回すか、金額を見直してください。";
+    } else if (limit > 0 && remain <= limit * 0.1) {
+      el.overWarn.hidden = false;
+      el.overWarn.textContent = "残枠は " + yen(remain) + "。上限の1割を切りました。";
+    } else {
+      el.overWarn.hidden = true;
+    }
+
+    STATUSES.forEach(function (s) {
+      var C = cap(s);
+      el["c" + C].textContent = by[s].length + "件";
+      el["t" + C].textContent = yen(totals[s]);
+      renderRows(el["rows" + C], by[s], s);
+    });
+  }
+
+  var EMPTY_TEXT = {
+    todo: "これから申請するものはありません。",
+    applied: "申請中のものはありません。",
+    received: "まだ受け取った費用はありません。"
+  };
+
+  function renderRows(container, list, status) {
+    container.innerHTML = "";
+    if (!list.length) {
+      var e = document.createElement("div");
+      e.className = "empty";
+      e.textContent = EMPTY_TEXT[status];
+      container.appendChild(e);
+      return;
+    }
+    list.forEach(function (it) {
+      container.appendChild(it.id === editingId ? editRow(it) : viewRow(it));
+    });
+  }
+
+  // 小項目が1つだけなら、右の合計と重複するので費目名だけを出す。
+  function splitText(it) {
+    var used = CATS.filter(function (c) { return (Number(it.amounts[c.k]) || 0) > 0; });
+    if (!used.length) return "";
+    if (used.length === 1) return used[0].label;
+    return used.map(function (c) { return c.label + " " + yen(it.amounts[c.k]); }).join("・");
+  }
+
+  function viewRow(it) {
+    var row = document.createElement("div");
+    row.className = "row";
+
+    var d = document.createElement("div");
+    d.className = "date";
+    d.textContent = fmtDate(it.date);
+    row.appendChild(d);
+
+    var desc = document.createElement("div");
+    desc.className = "desc";
+    var name = document.createElement("div");
+    name.className = "name";
+    name.textContent = it.name || "（無題）";
+    desc.appendChild(name);
+
+    var st = splitText(it);
+    if (st) {
+      var split = document.createElement("div");
+      split.className = "split";
+      split.textContent = st;
+      desc.appendChild(split);
+    }
+
+    if (it.note) {
+      var note = document.createElement("div");
+      note.className = "note";
+      note.textContent = it.note;
+      desc.appendChild(note);
+    }
+    row.appendChild(desc);
+
+    var amt = document.createElement("div");
+    amt.className = "amt";
+    amt.textContent = yen(it.amount);
+    row.appendChild(amt);
+
+    var acts = document.createElement("div");
+    acts.className = "acts";
+
+    if (it.status === "todo") {
+      acts.appendChild(btn("申請した →", "advance", function () { setStatus(it.id, "applied"); }));
+    } else if (it.status === "applied") {
+      acts.appendChild(btn("受け取った →", "advance", function () { setStatus(it.id, "received"); }));
+      acts.appendChild(btn("戻す", "quiet", function () { setStatus(it.id, "todo"); }));
+    } else {
+      acts.appendChild(btn("戻す", "quiet", function () { setStatus(it.id, "applied"); }));
+    }
+    acts.appendChild(btn("編集", "quiet", function () { editingId = it.id; render(); }));
+    acts.appendChild(btn("削除", "quiet danger", function () { remove(it); }));
+
+    row.appendChild(acts);
+    return row;
+  }
+
+  function editRow(it) {
+    var box = document.createElement("div");
+    box.className = "editrow";
+
+    var dateI = input("date", it.date);
+    var nameI = input("text", it.name || "");
+    nameI.placeholder = "内容";
+
+    var top = document.createElement("div");
+    top.className = "top";
+    top.appendChild(dateI);
+    top.appendChild(nameI);
+    box.appendChild(top);
+
+    var amts = document.createElement("div");
+    amts.className = "amts";
+    var catI = {};
+    CATS.forEach(function (c) {
+      var lab = document.createElement("label");
+      lab.className = "field";
+      var cap = document.createElement("span");
+      cap.textContent = c.label;
+      catI[c.k] = input("number", it.amounts[c.k] || "");
+      catI[c.k].placeholder = "0";
+      catI[c.k].setAttribute("aria-label", c.label);
+      lab.appendChild(cap);
+      lab.appendChild(catI[c.k]);
+      amts.appendChild(lab);
+    });
+    box.appendChild(amts);
+
+    var noteI = input("text", it.note || "");
+    noteI.placeholder = "メモ";
+    box.appendChild(noteI);
+
+    var btns = document.createElement("div");
+    btns.className = "btns";
+    btns.appendChild(btn("保存", "primary", function () {
+      if (!dateI.value) { toast("利用日を入れてください。"); return; }
+      var next = {}, total = 0, bad = false;
+      CATS.forEach(function (c) {
+        var v = catI[c.k].value === "" ? 0 : Number(catI[c.k].value);
+        if (!isFinite(v) || v < 0) bad = true;
+        next[c.k] = Math.round(Math.max(0, v || 0));
+        total += next[c.k];
+      });
+      if (bad) { toast("金額は0以上の数字で入れてください。"); return; }
+      if (total <= 0) { toast("参加費・宿泊費・交通費・その他のどれかに金額を入れてください。"); return; }
+      it.date = dateI.value;
+      it.name = nameI.value.trim();
+      it.amounts = next;
+      it.amount = total;
+      it.note = noteI.value.trim();
+      editingId = null;
+      save();
+      if (termOf(it.date) !== currentTerm) currentTerm = termOf(it.date);
+      render();
+      toast("保存しました");
+    }));
+    btns.appendChild(btn("キャンセル", "", function () { editingId = null; render(); }));
+    box.appendChild(btns);
+
+    setTimeout(function () { nameI.focus(); }, 0);
+    return box;
+  }
+
+  function input(type, value) {
+    var i = document.createElement("input");
+    i.type = type;
+    i.value = value == null ? "" : value;
+    if (type === "number") { i.min = "0"; i.step = "1"; }
+    return i;
+  }
+
+  function btn(text, cls, fn) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = cls;
+    b.textContent = text;
+    b.addEventListener("click", fn);
+    return b;
+  }
+
+  /* ---------- mutations ---------- */
+
+  function find(id) {
+    for (var i = 0; i < state.items.length; i++) if (state.items[i].id === id) return state.items[i];
+    return null;
+  }
+
+  function setStatus(id, status) {
+    var it = find(id);
+    if (!it) return;
+    it.status = status;
+    if (status === "applied") it.appliedAt = todayISO();
+    if (status === "received") it.receivedAt = todayISO();
+    save();
+    render();
+    toast(LABEL[status] + "に移しました");
+  }
+
+  function remove(it) {
+    if (!confirm("「" + (it.name || "無題") + " " + yen(it.amount) + "」を削除します。よろしいですか？")) return;
+    state.items = state.items.filter(function (x) { return x.id !== it.id; });
+    save();
+    render();
+    toast("削除しました");
+  }
+
+  function readForm() {
+    var amounts = {}, total = 0;
+    CATS.forEach(function (c) {
+      var raw = el["f" + c.id].value;
+      var v = raw === "" ? 0 : Number(raw);
+      amounts[c.k] = isFinite(v) && v > 0 ? Math.round(v) : 0;
+      total += amounts[c.k];
+    });
+    return { amounts: amounts, total: total };
+  }
+
+  function refreshFormTotal() {
+    el.fTotal.textContent = yen(readForm().total);
+  }
+
+  function add() {
+    var date = el.fDate.value || todayISO();
+    var name = el.fName.value.trim();
+    var f = readForm();
+    if (!name) { toast("内容を入れてください。"); el.fName.focus(); return; }
+    if (f.total <= 0) {
+      toast("参加費・宿泊費・交通費・その他のどれかに金額を入れてください。");
+      el.fFee.focus();
+      return;
+    }
+
+    state.items.push({
+      id: "k" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      date: date,
+      name: name,
+      amounts: f.amounts,
+      amount: f.total,
+      note: el.fNote.value.trim(),
+      status: "todo"
+    });
+    save();
+
+    el.fName.value = "";
+    el.fNote.value = "";
+    CATS.forEach(function (c) { el["f" + c.id].value = ""; });
+    refreshFormTotal();
+
+    var t = termOf(date);
+    if (t !== currentTerm) currentTerm = t;
+    render();
+    el.fName.focus();
+    toast("申請未に追加しました");
+  }
+
+  /* ---------- backup ---------- */
+
+  function exportData() {
+    var json = JSON.stringify(state, null, 2);
+    var filename = "keihi-daicho-" + todayISO() + ".json";
+    if (window.claude && window.claude.downloads) {
+      window.claude.downloads.save({ filename: filename, data: json })
+        .then(function () { toast("バックアップを保存しました"); })
+        .catch(function (err) {
+          if (err && err.code === "declined") return;
+          if (err && err.code === "rate_limited") { toast("少し待ってからもう一度お試しください。"); return; }
+          fallbackDownload(json, filename);
+        });
+      return;
+    }
+    fallbackDownload(json, filename);
+  }
+
+  function fallbackDownload(json, filename) {
+    try {
+      var url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      toast("バックアップを保存しました");
+    } catch (e) {
+      toast("この画面ではファイル保存が使えません。");
+    }
+  }
+
+  function importData(file) {
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var d = JSON.parse(String(r.result));
+        if (!d || !Array.isArray(d.items)) throw new Error("bad");
+        var items = d.items
+          .filter(function (it) {
+            return it && typeof it.date === "string" && STATUSES.indexOf(it.status) !== -1;
+          })
+          .map(normalize);
+        if (!confirm("いまのデータを、読み込んだ " + items.length + "件で置き換えます。よろしいですか？")) return;
+        state = {
+          version: 2,
+          limit: typeof d.limit === "number" && d.limit >= 0 ? d.limit : 300000,
+          items: items
+        };
+        save();
+        currentTerm = termOf(todayISO());
+        render();
+        toast(items.length + "件を復元しました");
+      } catch (e) {
+        toast("このファイルは読み込めませんでした。台帳のバックアップJSONを選んでください。");
+      }
+    };
+    r.onerror = function () { toast("ファイルを読み込めませんでした。"); };
+    r.readAsText(file);
+  }
+
+  /* ---------- misc ---------- */
+
+  /* ---------- theme ---------- */
+
+  var THEME_KEY = "keihi-theme";
+  var darkQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+  function storedTheme() {
+    try {
+      var t = localStorage.getItem(THEME_KEY);
+      return t === "light" || t === "dark" ? t : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function osTheme() { return darkQuery && darkQuery.matches ? "dark" : "light"; }
+
+  function applyTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    el.themeBtn.textContent = t === "dark" ? "☀" : "☾";
+    el.themeBtn.setAttribute("aria-label", t === "dark" ? "ライトテーマに切り替え" : "ダークテーマに切り替え");
+  }
+
+  el.themeBtn.addEventListener("click", function () {
+    var next = (storedTheme() || osTheme()) === "dark" ? "light" : "dark";
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* 保存できなくても切り替えは効く */ }
+    applyTheme(next);
+  });
+
+  // 明示的に選んでいない間はOSの設定に追従する。
+  if (darkQuery && darkQuery.addEventListener) {
+    darkQuery.addEventListener("change", function () {
+      if (!storedTheme()) applyTheme(osTheme());
+    });
+  }
+
+  /* ---------- misc ---------- */
+
+  var toastTimer;
+  function toast(msg) {
+    el.toast.textContent = msg;
+    el.toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.toast.classList.remove("show"); }, 2600);
+  }
+
+  /* ---------- wiring ---------- */
+
+  el.addBtn.addEventListener("click", add);
+  var formFields = [el.fName, el.fNote].concat(CATS.map(function (c) { return el["f" + c.id]; }));
+  formFields.forEach(function (i) {
+    i.addEventListener("keydown", function (e) { if (e.key === "Enter") add(); });
+  });
+  CATS.forEach(function (c) {
+    el["f" + c.id].addEventListener("input", refreshFormTotal);
+  });
+
+  el.termSelect.addEventListener("change", function () {
+    currentTerm = Number(el.termSelect.value);
+    editingId = null;
+    render();
+  });
+  el.prevTerm.addEventListener("click", function () { currentTerm -= 1; editingId = null; render(); });
+  el.nextTerm.addEventListener("click", function () { currentTerm += 1; editingId = null; render(); });
+
+  el.limitInput.addEventListener("change", function () {
+    var v = Number(el.limitInput.value);
+    state.limit = isFinite(v) && v >= 0 ? Math.round(v) : 300000;
+    save();
+    render();
+  });
+
+  el.exportBtn.addEventListener("click", exportData);
+  el.importBtn.addEventListener("click", function () { el.importFile.click(); });
+  el.importFile.addEventListener("change", function () {
+    if (el.importFile.files && el.importFile.files[0]) importData(el.importFile.files[0]);
+    el.importFile.value = "";
+  });
+
+  applyTheme(storedTheme() || osTheme());
+  el.fDate.value = todayISO();
+  refreshFormTotal();
+  render();
+})();
+</script>
+
+</body>
+</html>
