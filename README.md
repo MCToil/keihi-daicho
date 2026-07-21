@@ -7,7 +7,7 @@
 
 ## 使う
 
-**https://<username>.github.io/keihi-daicho/**
+**https://mctoil.github.io/keihi-daicho/**
 
 ローカルで開く場合は `index.html` をブラウザにドラッグするだけです。
 
