@@ -577,7 +577,7 @@
   .row .desc { min-width: 0; }
   .row .desc .name { word-break: break-word; }
 
-  .pill-web {
+  .pill-web, .pill-group {
     display: inline-block;
     margin-left: 8px;
     padding: 0 5px;
@@ -586,9 +586,18 @@
     letter-spacing: 0.12em;
     vertical-align: 1px;
     border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .pill-web {
     border: 1px solid var(--accent-mid);
     background: var(--accent-soft);
     color: var(--accent);
+  }
+
+  .pill-group {
+    border: 1px solid var(--rule);
+    color: var(--ink-2);
   }
   .row .desc .split {
     font-size: 11.5px;
@@ -664,6 +673,82 @@
     .editrow .amts { grid-template-columns: repeat(2, 1fr); }
     .editrow .top .checkfield { grid-column: 1 / -1; }
   }
+
+  /* 分割パネル */
+
+  .splitrow {
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    padding: 16px 12px;
+    border-bottom: 1px solid var(--rule-soft);
+    background: var(--rule-soft);
+  }
+
+  .splitrow .lead {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink-2);
+  }
+
+  .splitrow .picks { display: flex; flex-direction: column; gap: 6px; }
+
+  .splitrow .pick {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 8px 13px;
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    background: var(--card);
+    cursor: pointer;
+    user-select: none;
+    transition: background .13s, border-color .13s;
+  }
+
+  .splitrow .pick.on { border-color: var(--accent-mid); background: var(--accent-soft); }
+
+  .splitrow .pick input {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .splitrow .pick .cat { flex: 1; font-size: 14px; }
+
+  .splitrow .pick .amt {
+    font-family: var(--font-num);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .splitrow .preview {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .splitrow .preview > div {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding-left: 11px;
+    border-left: 2px solid var(--accent-soft);
+    min-width: 0;
+  }
+
+  .splitrow .preview span { font-size: 11px; color: var(--ink-2); letter-spacing: 0.08em; }
+
+  .splitrow .preview b {
+    font-family: var(--font-num);
+    font-size: 16px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .splitrow .btns { display: flex; gap: 6px; }
 
   /* ---------- footer ---------- */
 
@@ -872,6 +957,8 @@
   var state = load();
   var currentTerm = termOf(todayISO());
   var editingId = null;
+  var splittingId = null;
+  var groupCount = {};
 
   /* ---------- storage ---------- */
 
@@ -905,6 +992,7 @@
     it.amounts = out;
     it.amount = CATS.reduce(function (s, c) { return s + out[c.k]; }, 0);
 
+    it.groupId = str(it.groupId);
     it.periodStart = str(it.periodStart);
     it.periodEnd = str(it.periodEnd);
     it.paidAt = str(it.paidAt);
@@ -1027,6 +1115,12 @@
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
   function render() {
+    // 同じイベントから分割された明細は期をまたぐこともあるので全件から数える
+    groupCount = {};
+    state.items.forEach(function (it) {
+      if (it.groupId) groupCount[it.groupId] = (groupCount[it.groupId] || 0) + 1;
+    });
+
     // 期セレクタ
     var terms = knownTerms();
     el.termSelect.innerHTML = "";
@@ -1130,13 +1224,15 @@
       return;
     }
     list.forEach(function (it) {
-      container.appendChild(it.id === editingId ? editRow(it) : viewRow(it));
+      if (it.id === editingId) container.appendChild(editRow(it));
+      else if (it.id === splittingId) container.appendChild(splitRow(it));
+      else container.appendChild(viewRow(it));
     });
   }
 
   // 小項目が1つだけなら、右の合計と重複するので費目名だけを出す。
   function splitText(it) {
-    var used = CATS.filter(function (c) { return (Number(it.amounts[c.k]) || 0) > 0; });
+    var used = usedCats(it);
     if (!used.length) return "";
     if (used.length === 1) return used[0].label;
     return used.map(function (c) { return c.label + " " + yen(it.amounts[c.k]); }).join("・");
@@ -1172,6 +1268,12 @@
       pill.className = "pill-web";
       pill.textContent = "WEB";
       name.appendChild(pill);
+    }
+    if (it.groupId && groupCount[it.groupId] > 1) {
+      var gp = document.createElement("span");
+      gp.className = "pill-group";
+      gp.textContent = "分割 " + groupCount[it.groupId] + "件";
+      name.appendChild(gp);
     }
     desc.appendChild(name);
 
@@ -1221,11 +1323,144 @@
     } else {
       acts.appendChild(btn("戻す", "quiet", function () { setStatus(it.id, "applied"); }));
     }
-    acts.appendChild(btn("編集", "quiet", function () { editingId = it.id; render(); }));
+    if (splittable(it)) {
+      acts.appendChild(btn("分割", "quiet", function () {
+        editingId = null;
+        splittingId = it.id;
+        render();
+      }));
+    }
+    acts.appendChild(btn("編集", "quiet", function () { splittingId = null; editingId = it.id; render(); }));
     acts.appendChild(btn("削除", "quiet danger", function () { remove(it); }));
 
     row.appendChild(acts);
     return row;
+  }
+
+  function usedCats(it) {
+    return CATS.filter(function (c) { return (Number(it.amounts[c.k]) || 0) > 0; });
+  }
+
+  // 費目が2つ以上ないと分けようがない。
+  function splittable(it) { return usedCats(it).length > 1; }
+
+  // 参加費だけ先に申請して受け取り、交通費と宿泊費は参加日のあとに別途申請する、
+  // といったケース用。選んだ費目を新しい明細として切り出し、申請未に置く。
+  function splitRow(it) {
+    var box = document.createElement("div");
+    box.className = "splitrow";
+
+    var lead = document.createElement("div");
+    lead.className = "lead";
+    lead.textContent = "後日あらためて申請する費目を選んでください。選んだ分が新しい明細として切り出され、申請未に入ります。日付は空の状態で始まります。";
+    box.appendChild(lead);
+
+    var used = usedCats(it);
+    var picks = document.createElement("div");
+    picks.className = "picks";
+    var boxes = {};
+
+    used.forEach(function (c) {
+      var lab = document.createElement("label");
+      lab.className = "pick";
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.setAttribute("aria-label", c.label + " を切り出す");
+      var cat = document.createElement("span");
+      cat.className = "cat";
+      cat.textContent = c.label;
+      var amt = document.createElement("span");
+      amt.className = "amt";
+      amt.textContent = yen(it.amounts[c.k]);
+      lab.appendChild(cb);
+      lab.appendChild(cat);
+      lab.appendChild(amt);
+      picks.appendChild(lab);
+      boxes[c.k] = cb;
+      cb.addEventListener("change", function () {
+        lab.classList.toggle("on", cb.checked);
+        refresh();
+      });
+    });
+    box.appendChild(picks);
+
+    var preview = document.createElement("div");
+    preview.className = "preview";
+    var stayVal = document.createElement("b");
+    var goVal = document.createElement("b");
+    [["この明細に残る", stayVal], ["切り出す（申請未）", goVal]].forEach(function (p) {
+      var cell = document.createElement("div");
+      var cap = document.createElement("span");
+      cap.textContent = p[0];
+      cell.appendChild(cap);
+      cell.appendChild(p[1]);
+      preview.appendChild(cell);
+    });
+    box.appendChild(preview);
+
+    function selected() {
+      return Object.keys(boxes).filter(function (k) { return boxes[k].checked; });
+    }
+
+    function refresh() {
+      var go = selected().reduce(function (s, k) { return s + it.amounts[k]; }, 0);
+      stayVal.textContent = yen(it.amount - go);
+      goVal.textContent = yen(go);
+    }
+    refresh();
+
+    var btns = document.createElement("div");
+    btns.className = "btns";
+    btns.appendChild(btn("分割する", "primary", function () {
+      var sel = selected();
+      if (!sel.length) { toast("切り出す費目を選んでください。"); return; }
+      if (sel.length === used.length) {
+        toast("すべては切り出せません。元の明細に1つ以上残してください。");
+        return;
+      }
+      doSplit(it, sel);
+    }));
+    btns.appendChild(btn("キャンセル", "", function () { splittingId = null; render(); }));
+    box.appendChild(btns);
+
+    return box;
+  }
+
+  function doSplit(it, keys) {
+    if (!it.groupId) {
+      it.groupId = "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    }
+
+    var moved = {};
+    CATS.forEach(function (c) { moved[c.k] = 0; });
+    keys.forEach(function (k) {
+      moved[k] = it.amounts[k];
+      it.amounts[k] = 0;
+    });
+    it.amount = CATS.reduce(function (s, c) { return s + it.amounts[c.k]; }, 0);
+
+    // 切り出した側はこれから申請するものなので、日付は引き継がない。
+    var next = normalize({
+      id: "k" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      date: it.date,
+      name: it.name,
+      web: it.web,
+      amounts: moved,
+      periodStart: it.periodStart,
+      periodEnd: it.periodEnd,
+      paidAt: "",
+      appliedAt: "",
+      receivedAt: "",
+      note: it.note,
+      groupId: it.groupId,
+      status: "todo"
+    });
+
+    state.items.splice(state.items.indexOf(it) + 1, 0, next);
+    splittingId = null;
+    save();
+    render();
+    toast("分割しました。切り出した分は申請未にあります。");
   }
 
   function editRow(it) {
@@ -1610,10 +1845,11 @@
   el.termSelect.addEventListener("change", function () {
     currentTerm = Number(el.termSelect.value);
     editingId = null;
+    splittingId = null;
     render();
   });
-  el.prevTerm.addEventListener("click", function () { currentTerm -= 1; editingId = null; render(); });
-  el.nextTerm.addEventListener("click", function () { currentTerm += 1; editingId = null; render(); });
+  el.prevTerm.addEventListener("click", function () { currentTerm -= 1; editingId = null; splittingId = null; render(); });
+  el.nextTerm.addEventListener("click", function () { currentTerm += 1; editingId = null; splittingId = null; render(); });
 
   el.limitInput.addEventListener("change", function () {
     var v = Number(el.limitInput.value);
