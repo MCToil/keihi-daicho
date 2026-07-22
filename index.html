@@ -202,7 +202,7 @@
 
   /* ---------- inputs ---------- */
 
-  input[type="text"], input[type="date"], input[type="number"] {
+  input[type="text"], input[type="date"], input[type="number"], input[type="password"] {
     font-family: var(--font-ui);
     font-size: 14px;
     color: var(--ink);
@@ -767,6 +767,122 @@
     margin-left: auto;
   }
 
+  /* ---------- 同期 ---------- */
+
+  .syncpanel {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    padding: 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .syncpanel[hidden] { display: none; }
+
+  .syncpanel h2 {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    margin: 0;
+  }
+
+  .syncpanel p { margin: 0; font-size: 13px; line-height: 1.8; color: var(--ink-2); }
+
+  .syncpanel ol {
+    margin: 0;
+    padding-left: 1.4em;
+    font-size: 13px;
+    line-height: 1.95;
+    color: var(--ink-2);
+  }
+
+  .syncpanel code {
+    font-family: var(--font-num);
+    font-size: 12px;
+    background: var(--rule-soft);
+    color: var(--ink);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  .syncpanel .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+  .syncpanel .btns { display: flex; gap: 7px; flex-wrap: wrap; }
+
+  .syncpanel .caution {
+    font-size: 12.5px;
+    line-height: 1.75;
+    color: var(--ink-2);
+    background: var(--rule-soft);
+    border-radius: var(--r);
+    padding: 11px 14px;
+  }
+
+  /* 競合ダイアログ */
+
+  .modal-back {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(9, 13, 11, 0.55);
+  }
+
+  .modal {
+    width: 100%;
+    max-width: 470px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    padding: 24px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-shadow: 0 18px 52px rgba(0, 0, 0, 0.3);
+  }
+
+  .modal h3 {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    margin: 0;
+  }
+
+  .modal p { margin: 0; font-size: 13px; line-height: 1.8; color: var(--ink-2); }
+
+  .modal .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  .modal .sides > div {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding-left: 11px;
+    border-left: 2px solid var(--accent-soft);
+    min-width: 0;
+  }
+
+  .modal .sides span { font-size: 11px; color: var(--ink-2); letter-spacing: 0.08em; }
+
+  .modal .sides b {
+    font-family: var(--font-num);
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .modal .acts { display: flex; flex-direction: column; gap: 7px; }
+
+  @media (max-width: 700px) {
+    .syncpanel .row2 { grid-template-columns: 1fr; }
+    .modal .sides { grid-template-columns: 1fr; }
+  }
+
   .toast {
     position: fixed;
     left: 50%;
@@ -928,11 +1044,50 @@
   </section>
 
   <footer class="tools">
+    <button type="button" id="syncBtn">今すぐ同期</button>
+    <button type="button" id="syncSetupBtn">同期の設定</button>
     <button type="button" id="exportBtn">バックアップを保存</button>
     <button type="button" id="importBtn">バックアップから復元</button>
     <input type="file" id="importFile" accept="application/json,.json" class="sr">
-    <span class="note">期は4月1日〜翌3月31日。データはこのブラウザ内に保存されます。</span>
+    <span class="note" id="syncStatus">同期は未設定です。</span>
   </footer>
+
+  <section class="syncpanel" id="syncPanel" hidden aria-label="同期の設定">
+    <h2>iPhone と Mac で同期する</h2>
+    <p>
+      台帳データをご自身の<strong>非公開Gist</strong>に保存し、両方の端末で読み書きします。
+      新しいサービスの登録は要りません。GitHubのトークンを1回発行し、端末ごとに下の欄へ貼り付けてください。
+    </p>
+    <ol>
+      <li>GitHub → Settings → Developer settings → Personal access tokens → <strong>Tokens (classic)</strong> で新規発行</li>
+      <li>スコープは <code>gist</code> だけにチェック（他は不要です）</li>
+      <li>発行されたトークンを下に貼り付けて「保存して同期」</li>
+      <li>もう一方の端末でも同じトークンを貼り付ける。保存先のGistは自動で引き継がれます</li>
+    </ol>
+
+    <div class="row2">
+      <label class="field">
+        <span>アクセストークン</span>
+        <input type="password" id="syncToken" placeholder="ghp_…" autocomplete="off" spellcheck="false" aria-label="GitHubアクセストークン">
+      </label>
+      <label class="field">
+        <span>Gist ID（2台目以降）</span>
+        <input type="text" id="syncGist" placeholder="1台目では空のままで結構です" autocomplete="off" spellcheck="false" aria-label="Gist ID">
+      </label>
+    </div>
+
+    <div class="btns">
+      <button type="button" class="primary" id="syncSave">保存して同期</button>
+      <button type="button" id="syncCopyId">Gist IDをコピー</button>
+      <button type="button" class="danger" id="syncClear">この端末の同期を解除</button>
+      <button type="button" id="syncClose">閉じる</button>
+    </div>
+
+    <p class="caution">
+      トークンはこの端末のブラウザ内にのみ保存され、GitHub以外には送信されません。共用の端末では使わないでください。
+      不要になったら「この端末の同期を解除」でトークンを削除し、GitHub側でも失効させてください。
+    </p>
+  </section>
 
 </div>
 
@@ -962,7 +1117,7 @@
 
   /* ---------- storage ---------- */
 
-  function blank() { return { version: 4, limit: 300000, items: [] }; }
+  function blank() { return { version: 4, limit: 300000, updatedAt: "", items: [] }; }
 
   // WEB受講なら現地に行かないので、宿泊費と交通費は持たない。
   var WEB_EXCLUDED = ["lodge", "trans"];
@@ -1015,6 +1170,7 @@
       if (!d || !Array.isArray(d.items)) return blank();
       if (typeof d.limit !== "number" || d.limit < 0) d.limit = 300000;
       d.version = 4;
+      d.updatedAt = typeof d.updatedAt === "string" ? d.updatedAt : "";
       d.items = d.items
         .filter(function (it) { return it && typeof it.date === "string"; })
         .map(normalize);
@@ -1024,12 +1180,19 @@
     }
   }
 
-  function save() {
+  function persist() {
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
     } catch (e) {
       toast("保存できませんでした。ブラウザの保存容量またはプライベートモードを確認してください。");
     }
+  }
+
+  // 変更を保存する。updatedAt が同期の基準になるので、ここでだけ進める。
+  function save() {
+    state.updatedAt = new Date().toISOString();
+    persist();
+    scheduleSync();
   }
 
   /* ---------- dates & terms ---------- */
@@ -1109,7 +1272,9 @@
    "fPeriodStart","fPeriodEnd","fPaid","fApplied","fReceived","fWeb","fWebBox",
    "cTodo","cApplied","cReceived","tTodo","tApplied","tReceived",
    "rowsTodo","rowsApplied","rowsReceived",
-   "exportBtn","importBtn","importFile","toast","themeBtn"]
+   "exportBtn","importBtn","importFile","toast","themeBtn",
+   "syncBtn","syncSetupBtn","syncPanel","syncStatus","syncToken","syncGist",
+   "syncSave","syncCopyId","syncClear","syncClose"]
     .forEach(function (id) { el[id] = document.getElementById(id); });
 
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -1781,6 +1946,327 @@
 
   /* ---------- misc ---------- */
 
+  /* ---------- 同期（GitHub Gist） ---------- */
+
+  var SYNC_KEY = "keihi-sync";
+  var GIST_FILE = "keihi-daicho.json";
+  var API = "https://api.github.com";
+
+  // 同期設定は端末ごとの持ち物なので、台帳データとは別のキーに置く。
+  // エクスポートにもGistにも含めない。
+  function loadSync() {
+    try {
+      var d = JSON.parse(localStorage.getItem(SYNC_KEY) || "null");
+      if (!d || typeof d !== "object") throw new Error("none");
+      return {
+        token: str(d.token),
+        gistId: str(d.gistId),
+        lastSyncedAt: str(d.lastSyncedAt),
+        lastSyncAt: str(d.lastSyncAt)
+      };
+    } catch (e) {
+      return { token: "", gistId: "", lastSyncedAt: "", lastSyncAt: "" };
+    }
+  }
+
+  function saveSync() {
+    try { localStorage.setItem(SYNC_KEY, JSON.stringify(sync)); } catch (e) { /* 同期設定は失っても再入力できる */ }
+  }
+
+  var sync = loadSync();
+  var syncing = false;
+  var syncTimer = null;
+  var lastAutoSync = 0;
+
+  function fmtStamp(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    return (d.getMonth() + 1) + "/" + d.getDate() + " " +
+      pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  function setSyncStatus(text) { el.syncStatus.textContent = text; }
+
+  function idleStatus() {
+    if (!sync.token) {
+      setSyncStatus("同期は未設定です。");
+    } else if (state.updatedAt && state.updatedAt !== sync.lastSyncedAt) {
+      setSyncStatus("未同期の変更があります（最終同期 " + fmtStamp(sync.lastSyncAt) + "）");
+    } else {
+      setSyncStatus("同期済み " + fmtStamp(sync.lastSyncAt));
+    }
+  }
+
+  function ghHeaders() {
+    return {
+      "Authorization": "Bearer " + sync.token,
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "Content-Type": "application/json"
+    };
+  }
+
+  function ghError(res) {
+    if (res.status === 401) return new Error("トークンが無効です。同期の設定から入れ直してください。");
+    if (res.status === 404) return new Error("Gistが見つかりません。Gist IDを確認してください。");
+    if (res.status === 403 || res.status === 429) return new Error("GitHubへの接続が制限されています。しばらく待ってから試してください。");
+    return new Error("GitHubと通信できませんでした（" + res.status + "）。");
+  }
+
+  function payload() {
+    return JSON.stringify({
+      version: state.version,
+      limit: state.limit,
+      updatedAt: state.updatedAt,
+      items: state.items
+    }, null, 2);
+  }
+
+  function parseRemote(text) {
+    var d = JSON.parse(text);
+    if (!d || !Array.isArray(d.items)) throw new Error("クラウド側のデータを読めませんでした。");
+    return {
+      version: 4,
+      limit: typeof d.limit === "number" && d.limit >= 0 ? d.limit : 300000,
+      updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
+      items: d.items
+        .filter(function (it) { return it && typeof it.date === "string"; })
+        .map(normalize)
+    };
+  }
+
+  function fetchRemote() {
+    return fetch(API + "/gists/" + encodeURIComponent(sync.gistId), { headers: ghHeaders() })
+      .then(function (res) {
+        if (!res.ok) throw ghError(res);
+        return res.json();
+      })
+      .then(function (g) {
+        var f = g.files && g.files[GIST_FILE];
+        if (!f) throw new Error("Gistに台帳のファイルがありません。");
+        // 巨大なGistは内容が省略される。その場合だけ本体を取りに行く。
+        if (f.truncated && f.raw_url) {
+          return fetch(f.raw_url).then(function (r) { return r.text(); }).then(parseRemote);
+        }
+        return parseRemote(f.content);
+      });
+  }
+
+  function pushRemote() {
+    var body = {
+      description: "費用申請台帳のデータ",
+      files: {}
+    };
+    body.files[GIST_FILE] = { content: payload() };
+
+    var creating = !sync.gistId;
+    if (creating) body.public = false;
+
+    return fetch(API + "/gists" + (creating ? "" : "/" + encodeURIComponent(sync.gistId)), {
+      method: creating ? "POST" : "PATCH",
+      headers: ghHeaders(),
+      body: JSON.stringify(body)
+    }).then(function (res) {
+      if (!res.ok) throw ghError(res);
+      return res.json();
+    }).then(function (g) {
+      if (creating && g.id) sync.gistId = g.id;
+      sync.lastSyncedAt = state.updatedAt;
+      sync.lastSyncAt = new Date().toISOString();
+      saveSync();
+      if (creating) fillSyncForm();
+      return "この端末の内容をクラウドに保存しました";
+    });
+  }
+
+  function applyRemote(remote) {
+    state = remote;
+    persist();
+    sync.lastSyncedAt = state.updatedAt;
+    sync.lastSyncAt = new Date().toISOString();
+    saveSync();
+    editingId = null;
+    splittingId = null;
+    render();
+    return "クラウドの内容を取り込みました";
+  }
+
+  function runSync(manual) {
+    if (!sync.token) {
+      if (manual) {
+        toast("先に同期の設定でトークンを登録してください。");
+        openSyncPanel();
+      }
+      return;
+    }
+    if (syncing) return;
+    syncing = true;
+    setSyncStatus("同期中…");
+
+    var work = sync.gistId ? fetchRemote() : Promise.resolve(null);
+
+    work.then(function (remote) {
+      if (!remote) return pushRemote();
+
+      var localChanged = state.updatedAt !== sync.lastSyncedAt;
+      var remoteChanged = remote.updatedAt !== sync.lastSyncedAt;
+
+      if (!localChanged && !remoteChanged) return "最新です";
+      if (!localChanged) return applyRemote(remote);
+      if (!remoteChanged) return pushRemote();
+      return askConflict(remote);
+    }).then(function (msg) {
+      syncing = false;
+      if (msg && manual) toast(msg);
+      idleStatus();
+    }).catch(function (err) {
+      syncing = false;
+      idleStatus();
+      var msg = err && err.message ? err.message : "同期に失敗しました。";
+      if (err && err.name === "TypeError") msg = "ネットワークに接続できませんでした。";
+      toast(msg);
+    });
+  }
+
+  // 両方で編集されていた場合だけ、消える方を見せてから選んでもらう。
+  function askConflict(remote) {
+    return new Promise(function (resolve) {
+      var back = document.createElement("div");
+      back.className = "modal-back";
+
+      var card = document.createElement("div");
+      card.className = "modal";
+      card.setAttribute("role", "dialog");
+      card.setAttribute("aria-modal", "true");
+
+      var h = document.createElement("h3");
+      h.textContent = "両方で変更されています";
+      card.appendChild(h);
+
+      var p = document.createElement("p");
+      p.textContent = "この端末とクラウドの両方に、前回の同期のあとの変更があります。どちらを残すか選んでください。選ばなかった側の変更は失われます。";
+      card.appendChild(p);
+
+      var sides = document.createElement("div");
+      sides.className = "sides";
+      [["この端末", state], ["クラウド", remote]].forEach(function (s) {
+        var cell = document.createElement("div");
+        var cap = document.createElement("span");
+        cap.textContent = s[0];
+        var when = document.createElement("b");
+        when.textContent = fmtStamp(s[1].updatedAt);
+        var cnt = document.createElement("b");
+        cnt.textContent = s[1].items.length + "件 / " + yen(sum(s[1].items));
+        cell.appendChild(cap);
+        cell.appendChild(when);
+        cell.appendChild(cnt);
+        sides.appendChild(cell);
+      });
+      card.appendChild(sides);
+
+      var acts = document.createElement("div");
+      acts.className = "acts";
+
+      function close(result) {
+        document.removeEventListener("keydown", onKey);
+        back.remove();
+        resolve(result);
+      }
+      function onKey(e) { if (e.key === "Escape") close("同期を中断しました"); }
+
+      acts.appendChild(btn("この端末の内容でクラウドを上書き", "primary", function () {
+        sync.lastSyncedAt = remote.updatedAt;
+        pushRemote().then(function (m) { close(m); }).catch(function (err) {
+          close(err && err.message ? err.message : "同期に失敗しました。");
+        });
+      }));
+      acts.appendChild(btn("クラウドの内容をこの端末に取り込む", "", function () {
+        close(applyRemote(remote));
+      }));
+      acts.appendChild(btn("あとで決める", "quiet", function () { close("同期を中断しました"); }));
+      card.appendChild(acts);
+
+      back.appendChild(card);
+      back.addEventListener("click", function (e) { if (e.target === back) close("同期を中断しました"); });
+      document.addEventListener("keydown", onKey);
+      document.body.appendChild(back);
+      card.querySelector("button").focus();
+    });
+  }
+
+  function scheduleSync() {
+    idleStatus();
+    if (!sync.token) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(function () { runSync(false); }, 2500);
+  }
+
+  function openSyncPanel() {
+    el.syncPanel.hidden = false;
+    fillSyncForm();
+    el.syncPanel.scrollIntoView({ block: "nearest" });
+  }
+
+  function fillSyncForm() {
+    el.syncToken.value = sync.token;
+    el.syncGist.value = sync.gistId;
+  }
+
+  el.syncBtn.addEventListener("click", function () { runSync(true); });
+
+  el.syncSetupBtn.addEventListener("click", function () {
+    if (el.syncPanel.hidden) openSyncPanel();
+    else el.syncPanel.hidden = true;
+  });
+
+  el.syncClose.addEventListener("click", function () { el.syncPanel.hidden = true; });
+
+  el.syncSave.addEventListener("click", function () {
+    var t = el.syncToken.value.trim();
+    if (!t) { toast("トークンを貼り付けてください。"); el.syncToken.focus(); return; }
+    sync.token = t;
+    var g = el.syncGist.value.trim();
+    if (g !== sync.gistId) {
+      sync.gistId = g;
+      sync.lastSyncedAt = "";   // 別の保存先を指したので、次回は競合判定からやり直す
+    }
+    saveSync();
+    el.syncPanel.hidden = true;
+    runSync(true);
+  });
+
+  el.syncCopyId.addEventListener("click", function () {
+    if (!sync.gistId) { toast("まだGistがありません。先に「保存して同期」を実行してください。"); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(sync.gistId)
+        .then(function () { toast("Gist IDをコピーしました"); })
+        .catch(function () { el.syncGist.select(); toast("コピーできませんでした。手動で選択してください。"); });
+    } else {
+      el.syncGist.select();
+      toast("表示中のGist IDを選択しました。手動でコピーしてください。");
+    }
+  });
+
+  el.syncClear.addEventListener("click", function () {
+    if (!confirm("この端末から同期の設定を削除します。台帳のデータは残ります。よろしいですか？")) return;
+    sync = { token: "", gistId: "", lastSyncedAt: "", lastSyncAt: "" };
+    saveSync();
+    fillSyncForm();
+    el.syncPanel.hidden = true;
+    idleStatus();
+    toast("同期を解除しました。GitHub側でもトークンを失効させてください。");
+  });
+
+  // 別の端末から戻ってきたときに拾えるよう、表示された時点でも確認する。
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible" || !sync.token) return;
+    var now = Date.now();
+    if (now - lastAutoSync < 10000) return;
+    lastAutoSync = now;
+    runSync(false);
+  });
+
   /* ---------- theme ---------- */
 
   var THEME_KEY = "keihi-theme";
@@ -1870,6 +2356,12 @@
   syncAddWeb();
   refreshFormTotal();
   render();
+  fillSyncForm();
+  idleStatus();
+  if (sync.token) {
+    lastAutoSync = Date.now();
+    runSync(false);
+  }
 })();
 </script>
 
