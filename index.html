@@ -1079,6 +1079,7 @@
     <div class="btns">
       <button type="button" class="primary" id="syncSave">保存して同期</button>
       <button type="button" id="syncCopyId">Gist IDをコピー</button>
+      <button type="button" id="syncRestore" hidden>取り込み前のデータに戻す</button>
       <button type="button" class="danger" id="syncClear">この端末の同期を解除</button>
       <button type="button" id="syncClose">閉じる</button>
     </div>
@@ -1098,6 +1099,7 @@
   "use strict";
 
   var KEY = "keihi-daicho-v1";
+  var BACKUP_KEY = "keihi-daicho-backup";
   var STATUSES = ["todo", "applied", "received"];
   var LABEL = { todo: "申請未", applied: "申請済み", received: "受取済み" };
 
@@ -1110,6 +1112,15 @@
   ];
 
   var state = load();
+
+  // 旧バージョンで作ったデータには updatedAt が無い。空のままだと同期が
+  // 「この端末には変更が無い」と誤判定し、中身があるのに上書きされてしまう。
+  // 中身があるなら必ず刻んでおく。
+  if (!state.updatedAt && state.items.length) {
+    state.updatedAt = new Date().toISOString();
+    persist();
+  }
+
   var currentTerm = termOf(todayISO());
   var editingId = null;
   var splittingId = null;
@@ -1274,7 +1285,7 @@
    "rowsTodo","rowsApplied","rowsReceived",
    "exportBtn","importBtn","importFile","toast","themeBtn",
    "syncBtn","syncSetupBtn","syncPanel","syncStatus","syncToken","syncGist",
-   "syncSave","syncCopyId","syncClear","syncClose"]
+   "syncSave","syncCopyId","syncClear","syncClose","syncRestore"]
     .forEach(function (id) { el[id] = document.getElementById(id); });
 
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -2081,6 +2092,15 @@
   }
 
   function applyRemote(remote) {
+    // 取り込むと手元の内容は消える。直前の状態を1世代だけ退避しておく。
+    if (state.items.length) {
+      try {
+        localStorage.setItem(BACKUP_KEY, JSON.stringify({
+          savedAt: new Date().toISOString(),
+          data: state
+        }));
+      } catch (e) { /* 退避できなくても取り込みは続ける */ }
+    }
     state = remote;
     persist();
     sync.lastSyncedAt = state.updatedAt;
@@ -2211,7 +2231,48 @@
   function fillSyncForm() {
     el.syncToken.value = sync.token;
     el.syncGist.value = sync.gistId;
+    refreshRestore();
   }
+
+  function readBackup() {
+    try {
+      var d = JSON.parse(localStorage.getItem(BACKUP_KEY) || "null");
+      return d && d.data && Array.isArray(d.data.items) ? d : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function refreshRestore() {
+    var b = readBackup();
+    el.syncRestore.hidden = !b;
+    if (b) {
+      el.syncRestore.textContent =
+        "取り込み前のデータに戻す（" + fmtStamp(b.savedAt) + "・" + b.data.items.length + "件）";
+    }
+  }
+
+  el.syncRestore.addEventListener("click", function () {
+    var b = readBackup();
+    if (!b) { refreshRestore(); return; }
+    if (!confirm("クラウドから取り込む直前の " + b.data.items.length + "件に戻します。いまの内容は失われます。よろしいですか？")) return;
+    state = {
+      version: 4,
+      limit: typeof b.data.limit === "number" ? b.data.limit : 300000,
+      updatedAt: "",
+      items: b.data.items.filter(function (it) {
+        return it && typeof it.date === "string";
+      }).map(normalize)
+    };
+    localStorage.removeItem(BACKUP_KEY);
+    editingId = null;
+    splittingId = null;
+    save();          // updatedAt が進むので、次の同期でこの内容が反映される
+    render();
+    refreshRestore();
+    el.syncPanel.hidden = true;
+    toast("取り込み前のデータに戻しました");
+  });
 
   el.syncBtn.addEventListener("click", function () { runSync(true); });
 
@@ -2306,6 +2367,7 @@
 
   var toastTimer;
   function toast(msg) {
+    if (!el || !el.toast) return;   // 起動直後（DOM取得前）に呼ばれても落とさない
     el.toast.textContent = msg;
     el.toast.classList.add("show");
     clearTimeout(toastTimer);
